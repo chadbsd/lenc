@@ -1,0 +1,6 @@
+enc.c - original version of lenc (very bad)
+lenc.c - 2nd version of lenc (better)
+randombytes.c - randombytes for sign/ and kem/
+monocypher.[ch] - monocypher (goated crypto lib)
+sign/ - dilithium
+kem/ - kyber
