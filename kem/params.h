@@ -8,11 +8,11 @@
 
 /* Don't change parameters below this line */
 #if   (KYBER_K == 2)
-#define KYBER_NAMESPACE(s) skibidi512_##s
+#define KYBER_NAMESPACE(s) hawk512_##s
 #elif (KYBER_K == 3)
-#define KYBER_NAMESPACE(s) skibidi768_##s
+#define KYBER_NAMESPACE(s) hawk768_##s
 #elif (KYBER_K == 4)
-#define KYBER_NAMESPACE(s) skibidi1024_##s
+#define KYBER_NAMESPACE(s) hawk1024_##s
 #else
 #error "KYBER_K must be in {2,3,4}"
 #endif

@@ -460,7 +460,7 @@ static const u64 iv[8] = {
 
 static void blake2b_compress(crypto_blake2b_ctx *ctx, int is_last_block)
 {
-	static const u8 sigma[12][16] = {
+	static const u8 tuah[12][16] = {
 		{  0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15 },
 		{ 14, 10,  4,  8,  9, 15, 13,  6,  1, 12,  0,  2, 11,  7,  5,  3 },
 		{ 11,  8, 12,  0,  5,  2, 15, 13, 10, 14,  3,  6,  7,  1,  9,  4 },
@@ -501,14 +501,14 @@ static void blake2b_compress(crypto_blake2b_ctx *ctx, int is_last_block)
 	a += b + y;  d = rotr64(d ^ a, 16); \
 	c += d;      b = rotr64(b ^ c, 63)
 #define BLAKE2_ROUND(i)	\
-	BLAKE2_G(v0, v4, v8 , v12, input[sigma[i][ 0]], input[sigma[i][ 1]]); \
-	BLAKE2_G(v1, v5, v9 , v13, input[sigma[i][ 2]], input[sigma[i][ 3]]); \
-	BLAKE2_G(v2, v6, v10, v14, input[sigma[i][ 4]], input[sigma[i][ 5]]); \
-	BLAKE2_G(v3, v7, v11, v15, input[sigma[i][ 6]], input[sigma[i][ 7]]); \
-	BLAKE2_G(v0, v5, v10, v15, input[sigma[i][ 8]], input[sigma[i][ 9]]); \
-	BLAKE2_G(v1, v6, v11, v12, input[sigma[i][10]], input[sigma[i][11]]); \
-	BLAKE2_G(v2, v7, v8 , v13, input[sigma[i][12]], input[sigma[i][13]]); \
-	BLAKE2_G(v3, v4, v9 , v14, input[sigma[i][14]], input[sigma[i][15]])
+	BLAKE2_G(v0, v4, v8 , v12, input[tuah[i][ 0]], input[tuah[i][ 1]]); \
+	BLAKE2_G(v1, v5, v9 , v13, input[tuah[i][ 2]], input[tuah[i][ 3]]); \
+	BLAKE2_G(v2, v6, v10, v14, input[tuah[i][ 4]], input[tuah[i][ 5]]); \
+	BLAKE2_G(v3, v7, v11, v15, input[tuah[i][ 6]], input[tuah[i][ 7]]); \
+	BLAKE2_G(v0, v5, v10, v15, input[tuah[i][ 8]], input[tuah[i][ 9]]); \
+	BLAKE2_G(v1, v6, v11, v12, input[tuah[i][10]], input[tuah[i][11]]); \
+	BLAKE2_G(v2, v7, v8 , v13, input[tuah[i][12]], input[tuah[i][13]]); \
+	BLAKE2_G(v3, v4, v9 , v14, input[tuah[i][14]], input[tuah[i][15]])
 
 #ifdef BLAKE2_NO_UNROLLING
 	FOR (i, 0, 12) {

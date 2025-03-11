@@ -28,15 +28,15 @@ struct file {
     .set = 0,
 };
 
-#define PUBKEYFILESIZE (SKIBIDI768_PUBLICKEYBYTES + SIGMA3_PUBLICKEYBYTES)
-#define SECKEYFILESIZE (SKIBIDI768_SECRETKEYBYTES + SIGMA3_SECRETKEYBYTES)
+#define PUBKEYFILESIZE (HAWK768_PUBLICKEYBYTES + TUAH3_PUBLICKEYBYTES)
+#define SECKEYFILESIZE (HAWK768_SECRETKEYBYTES + TUAH3_SECRETKEYBYTES)
 
 struct pubkey {
     union {
         unsigned char buf[PUBKEYFILESIZE];
         struct {
-            unsigned char kem[SKIBIDI768_PUBLICKEYBYTES];
-            unsigned char sign[SIGMA3_PUBLICKEYBYTES];
+            unsigned char kem[HAWK768_PUBLICKEYBYTES];
+            unsigned char sign[TUAH3_PUBLICKEYBYTES];
         };
     };
 };
@@ -45,8 +45,8 @@ struct seckey {
     union {
         unsigned char buf[SECKEYFILESIZE];
         struct {
-            unsigned char kem[SKIBIDI768_SECRETKEYBYTES];
-            unsigned char sign[SIGMA3_SECRETKEYBYTES];
+            unsigned char kem[HAWK768_SECRETKEYBYTES];
+            unsigned char sign[TUAH3_SECRETKEYBYTES];
         };
     };
 };
@@ -105,11 +105,11 @@ static struct option longopts[] = {
  * |----------------------------------------------------|
  * | recipient_count:   uint16_t                        |
  * |----------------------------------------------------|
- * | recipients:        SKIBIDI768_CIPHERTEXTBYTES * nr |
+ * | recipients:        HAWK768_CIPHERTEXTBYTES * nr |
  * |----------------------------------------------------|
  * | cipher_text:       <file size>                     |
  * |----------------------------------------------------|
- * | signature:         SIGMA3_BYTES + 64               |
+ * | signature:         TUAH3_BYTES + 64               |
  * |----------------------------------------------------|
  */
 
@@ -190,8 +190,8 @@ int
 lenc_encrypt(struct file *key, struct file *recs,
              struct file *in,  struct file *out)
 {
-    static unsigned char sm[64 + SIGMA3_BYTES];
-    static unsigned char ct[SKIBIDI768_CIPHERTEXTBYTES];
+    static unsigned char sm[64 + TUAH3_BYTES];
+    static unsigned char ct[HAWK768_CIPHERTEXTBYTES];
     static struct pubkey pub;
     static struct seckey sec;
     static struct blake2b_ctx ctx;
@@ -223,11 +223,11 @@ lenc_encrypt(struct file *key, struct file *recs,
     
     /* only runs once until i add actual nrecs */
     for (uint16_t i = 0; i < nrecs; i++) {
-        skibidi768_enc_derand(ct, ss, pub.kem, coins);
+        hawk768_enc_derand(ct, ss, pub.kem, coins);
         crypto_blake2b(shared, 32, ss, 32);
         crypto_wipe(ss, 32);
-        len = write(out->fd, ct, SKIBIDI768_CIPHERTEXTBYTES);
-        if (len != SKIBIDI768_CIPHERTEXTBYTES) err(1, "write(ct)");
+        len = write(out->fd, ct, HAWK768_CIPHERTEXTBYTES);
+        if (len != HAWK768_CIPHERTEXTBYTES) err(1, "write(ct)");
     }
 
     arc4random_buf(nonce, 24);
@@ -257,9 +257,9 @@ again:
         err(1, "wtf??");
     }
     crypto_blake2b_final(&ctx, hash);
-    sigma3(sm, &smlen, hash, 64, NULL, 0, sec.sign);
-    if (smlen != 64 + SIGMA3_BYTES) {
-        errx(1, "erm what the sigma");
+    tuah3(sm, &smlen, hash, 64, NULL, 0, sec.sign);
+    if (smlen != 64 + TUAH3_BYTES) {
+        errx(1, "erm what the tuah");
     }
     if (write(out->fd, sm, smlen) != (ssize_t)smlen) {
         err(1, "write(sm)");
@@ -282,8 +282,8 @@ int
 lenc_decrypt(struct file *key, struct file *rec,
              struct file *in, struct file *out)
 {
-    static unsigned char ct[SKIBIDI768_CIPHERTEXTBYTES];
-    static unsigned char sm[64 + SIGMA3_BYTES];
+    static unsigned char ct[HAWK768_CIPHERTEXTBYTES];
+    static unsigned char sm[64 + TUAH3_BYTES];
     static struct pubkey pub;
     static struct seckey sec;
     static struct blake2b_ctx ctx;
@@ -308,9 +308,9 @@ lenc_decrypt(struct file *key, struct file *rec,
     /* TODO: handle multiple recipients */
     len = read(in->fd, &nrecs, sizeof(nrecs));
     if (len != sizeof(nrecs)) err(1, "read(nrecs)");
-    len = read(in->fd, ct, SKIBIDI768_CIPHERTEXTBYTES);
-    if (len != SKIBIDI768_CIPHERTEXTBYTES) err(1, "read(ct)");
-    skibidi768_dec(ss, ct, sec.kem);
+    len = read(in->fd, ct, HAWK768_CIPHERTEXTBYTES);
+    if (len != HAWK768_CIPHERTEXTBYTES) err(1, "read(ct)");
+    hawk768_dec(ss, ct, sec.kem);
     crypto_blake2b(shared, 32, ss, 32);
     crypto_wipe(ss, 32);
 
@@ -346,11 +346,11 @@ lenc_decrypt(struct file *key, struct file *rec,
     }
     crypto_blake2b_final(&ctx, hash1);
 
-    if (read(in->fd, sm, 64 + SIGMA3_BYTES) != 64 + SIGMA3_BYTES) {
+    if (read(in->fd, sm, 64 + TUAH3_BYTES) != 64 + TUAH3_BYTES) {
         err(1, "read(sm)");
     }
 
-    ret = sigma3_open(hash2, &mlen, sm, 64 + SIGMA3_BYTES, 
+    ret = tuah3_open(hash2, &mlen, sm, 64 + TUAH3_BYTES, 
                         NULL, 0, pub.sign);
     if (ret == -1) errx(1, "signature failed: 0x01");
     if (mlen != 64) errx(1, "signature failed: 0x02");
@@ -375,38 +375,38 @@ lenc_decrypt(struct file *key, struct file *rec,
 int
 lenc_generate(void)
 {
-    static unsigned char skisec[SKIBIDI768_SECRETKEYBYTES];
-    static unsigned char skipub[SKIBIDI768_PUBLICKEYBYTES];
-    static unsigned char sigsec[SIGMA3_SECRETKEYBYTES];
-    static unsigned char sigpub[SIGMA3_PUBLICKEYBYTES];
+    static unsigned char skisec[HAWK768_SECRETKEYBYTES];
+    static unsigned char skipub[HAWK768_PUBLICKEYBYTES];
+    static unsigned char sigsec[TUAH3_SECRETKEYBYTES];
+    static unsigned char sigpub[TUAH3_PUBLICKEYBYTES];
 
     int pubfd, secfd;
     ssize_t len;
 
-    skibidi768_keypair(skipub, skisec);
-    sigma3_keypair(sigpub, sigsec);
+    hawk768_keypair(skipub, skisec);
+    tuah3_keypair(sigpub, sigsec);
 
     pubfd = open("public.key", O_RDWR | O_CREAT, 0644);
     if (pubfd == -1) err(1, "open(public.key)");
     secfd = open("secret.key", O_RDWR | O_CREAT, 0600);
     if (secfd == -1) err(1, "open(secret.key)");
 
-    len = write(pubfd, skipub, SKIBIDI768_PUBLICKEYBYTES);
-    if (len != SKIBIDI768_PUBLICKEYBYTES) err(1, "write(public.key)");
-    len = write(pubfd, sigpub, SIGMA3_PUBLICKEYBYTES);
-    if (len != SIGMA3_PUBLICKEYBYTES) err(1, "write(public.key)");
+    len = write(pubfd, skipub, HAWK768_PUBLICKEYBYTES);
+    if (len != HAWK768_PUBLICKEYBYTES) err(1, "write(public.key)");
+    len = write(pubfd, sigpub, TUAH3_PUBLICKEYBYTES);
+    if (len != TUAH3_PUBLICKEYBYTES) err(1, "write(public.key)");
     if (!quiet) fprintf(stderr, "wrote public key to public.key\n");
 
-    len = write(secfd, skisec, SKIBIDI768_SECRETKEYBYTES);
-    if (len != SKIBIDI768_SECRETKEYBYTES) err(1, "write(secret.key)");
-    len = write(secfd, sigsec, SIGMA3_SECRETKEYBYTES);
-    if (len != SIGMA3_SECRETKEYBYTES) err(1, "write(secret.key)");
+    len = write(secfd, skisec, HAWK768_SECRETKEYBYTES);
+    if (len != HAWK768_SECRETKEYBYTES) err(1, "write(secret.key)");
+    len = write(secfd, sigsec, TUAH3_SECRETKEYBYTES);
+    if (len != TUAH3_SECRETKEYBYTES) err(1, "write(secret.key)");
     if (!quiet) fprintf(stderr, "wrote secret key to secret.key\n");
 
     close(secfd);
     close(pubfd);
-    crypto_wipe(skisec, SKIBIDI768_SECRETKEYBYTES);
-    crypto_wipe(sigsec, SIGMA3_SECRETKEYBYTES);
+    crypto_wipe(skisec, HAWK768_SECRETKEYBYTES);
+    crypto_wipe(sigsec, TUAH3_SECRETKEYBYTES);
     return 0;
 }
 
