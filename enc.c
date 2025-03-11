@@ -96,33 +96,33 @@ main(int argc, char *argv[])
     }
 }
 
-#define PUBKEYFILESIZE (SKIBIDI768_PUBLICKEYBYTES + SIGMA3_PUBLICKEYBYTES)
-#define SECKEYFILESIZE (SKIBIDI768_SECRETKEYBYTES + SIGMA3_SECRETKEYBYTES)
+#define PUBKEYFILESIZE (HAWK768_PUBLICKEYBYTES + TUAH3_PUBLICKEYBYTES)
+#define SECKEYFILESIZE (HAWK768_SECRETKEYBYTES + TUAH3_SECRETKEYBYTES)
 
 void
 readpubkeyfile(const char *path,
-            unsigned char kem[SKIBIDI768_PUBLICKEYBYTES],
-            unsigned char sign[SIGMA3_PUBLICKEYBYTES])
+            unsigned char kem[HAWK768_PUBLICKEYBYTES],
+            unsigned char sign[TUAH3_PUBLICKEYBYTES])
 {
     static unsigned char keys[PUBKEYFILESIZE];
     readfile(path, keys, PUBKEYFILESIZE);
     if (kem != NULL)
-        memcpy(kem, keys, SKIBIDI768_PUBLICKEYBYTES);
+        memcpy(kem, keys, HAWK768_PUBLICKEYBYTES);
     if (sign != NULL)
-        memcpy(sign, keys+SKIBIDI768_PUBLICKEYBYTES, SIGMA3_PUBLICKEYBYTES);
+        memcpy(sign, keys+HAWK768_PUBLICKEYBYTES, TUAH3_PUBLICKEYBYTES);
 }
 
 void
 readseckeyfile(const char *path,
-            unsigned char kem[SKIBIDI768_SECRETKEYBYTES],
-            unsigned char sign[SIGMA3_SECRETKEYBYTES])
+            unsigned char kem[HAWK768_SECRETKEYBYTES],
+            unsigned char sign[TUAH3_SECRETKEYBYTES])
 {
     static unsigned char keys[SECKEYFILESIZE];
     readfile(path, keys, SECKEYFILESIZE);
     if (kem != NULL)
-        memcpy(kem, keys, SKIBIDI768_SECRETKEYBYTES);
+        memcpy(kem, keys, HAWK768_SECRETKEYBYTES);
     if (sign != NULL)
-        memcpy(sign, keys+SKIBIDI768_SECRETKEYBYTES, SIGMA3_SECRETKEYBYTES);
+        memcpy(sign, keys+HAWK768_SECRETKEYBYTES, TUAH3_SECRETKEYBYTES);
     crypto_wipe(keys, SECKEYFILESIZE);
 }
 
@@ -131,11 +131,11 @@ enc_encrypt(char *keypath, char *recpath, char *filepath, char *outpath)
 {
     struct blake2b_ctx ctx;
     static unsigned char hash[64];
-    static unsigned char sm[64 + SIGMA3_BYTES];
+    static unsigned char sm[64 + TUAH3_BYTES];
     static unsigned char ss[32], shared[32];
-    static unsigned char signkey[SIGMA3_SECRETKEYBYTES];
-    static unsigned char reckey[SKIBIDI768_PUBLICKEYBYTES];
-    static unsigned char ct[SKIBIDI768_CIPHERTEXTBYTES];
+    static unsigned char signkey[TUAH3_SECRETKEYBYTES];
+    static unsigned char reckey[HAWK768_PUBLICKEYBYTES];
+    static unsigned char ct[HAWK768_CIPHERTEXTBYTES];
     static unsigned char nonce[24], mac[16];
     static unsigned char sigpath[64];
     uint64_t counter;
@@ -189,13 +189,13 @@ enc_encrypt(char *keypath, char *recpath, char *filepath, char *outpath)
     }
 
     readpubkeyfile(recpath, reckey, NULL);
-    skibidi768_enc(ct, ss, reckey);
+    hawk768_enc(ct, ss, reckey);
     crypto_blake2b(shared, 32, ss, 32);
 
     readseckeyfile(keypath, NULL, signkey);
     
-    len = write(outfd, ct, SKIBIDI768_CIPHERTEXTBYTES);
-    if (len != SKIBIDI768_CIPHERTEXTBYTES) err(1, "write(ct)");
+    len = write(outfd, ct, HAWK768_CIPHERTEXTBYTES);
+    if (len != HAWK768_CIPHERTEXTBYTES) err(1, "write(ct)");
     
     arc4random_buf(nonce, 24);
     write(outfd, nonce, 24);
@@ -233,7 +233,7 @@ again:
     crypto_blake2b_final(&ctx, hash);
 
     /* signing */
-    sigma3(sm, &smlen, hash, 64, NULL, 0, signkey);
+    tuah3(sm, &smlen, hash, 64, NULL, 0, signkey);
     if (write(sigfd, sm, smlen) != smlen)
         err(1, "write(signature)");
     close(sigfd);
@@ -242,7 +242,7 @@ again:
     
     crypto_wipe(ss, 32);
     crypto_wipe(shared, 32);
-    crypto_wipe(signkey, SIGMA3_SECRETKEYBYTES); 
+    crypto_wipe(signkey, TUAH3_SECRETKEYBYTES); 
     if (out) free(out);
     if (outfd != STDOUT_FILENO) close(outfd);
     if (infd != STDIN_FILENO) close(infd);
@@ -253,8 +253,8 @@ int
 enc_decrypt(char *keypath, char *secpath, char *filepath, char *outpath)
 {
     unsigned char ss[32], shared[32];
-    unsigned char seckey[SKIBIDI768_SECRETKEYBYTES];
-    unsigned char ct[SKIBIDI768_CIPHERTEXTBYTES];
+    unsigned char seckey[HAWK768_SECRETKEYBYTES];
+    unsigned char ct[HAWK768_CIPHERTEXTBYTES];
     unsigned char nonce[24], mac[16], mac2[16];
     uint64_t counter;
     int infd, outfd;
@@ -290,9 +290,9 @@ enc_decrypt(char *keypath, char *secpath, char *filepath, char *outpath)
 
     readseckeyfile(secpath, seckey, NULL);
     
-    len = read(infd, ct, SKIBIDI768_CIPHERTEXTBYTES);
-    if (len != SKIBIDI768_CIPHERTEXTBYTES) err(1, "read(ct)");
-    skibidi768_dec(ss, ct, seckey);
+    len = read(infd, ct, HAWK768_CIPHERTEXTBYTES);
+    if (len != HAWK768_CIPHERTEXTBYTES) err(1, "read(ct)");
+    hawk768_dec(ss, ct, seckey);
     crypto_blake2b(shared, 32, ss, 32);
     
     if (read(infd, nonce, 24) != 24) err(1, "read(nonce)");
@@ -329,8 +329,8 @@ enc_verify(char *keyfile, char *sigfile, char *filepath)
 {
     struct blake2b_ctx ctx;
     static unsigned char hash1[64], hash2[64];
-    static unsigned char sm[64 + SIGMA3_BYTES];
-    static unsigned char pubkey[SIGMA3_PUBLICKEYBYTES];
+    static unsigned char sm[64 + TUAH3_BYTES];
+    static unsigned char pubkey[TUAH3_PUBLICKEYBYTES];
     int fd, ret;
     ssize_t len;
     size_t mlen;
@@ -350,10 +350,10 @@ enc_verify(char *keyfile, char *sigfile, char *filepath)
     crypto_blake2b_final(&ctx, hash1);
 
     readpubkeyfile(keyfile, NULL, pubkey);
-    len = readfile(sigfile, sm, 64 + SIGMA3_BYTES);
+    len = readfile(sigfile, sm, 64 + TUAH3_BYTES);
 
-    ret = sigma3_open(hash2, &mlen, sm, len, NULL, 0, pubkey);
-    if (ret == -1) errx(1, "signature failed: sigma3_open()");
+    ret = tuah3_open(hash2, &mlen, sm, len, NULL, 0, pubkey);
+    if (ret == -1) errx(1, "signature failed: tuah3_open()");
     if (mlen != 64) errx(1, "signature failed: mlen = %zu", mlen);
     if (memcmp(hash1, hash2, 64)) errx(1, "signature failed: not equal");
     fprintf(stderr, "signature passed\n");
@@ -363,37 +363,37 @@ enc_verify(char *keyfile, char *sigfile, char *filepath)
 int
 enc_keygen(void)
 {
-    unsigned char skisec[SKIBIDI768_SECRETKEYBYTES];
-    unsigned char skipub[SKIBIDI768_PUBLICKEYBYTES];
-    unsigned char sigsec[SIGMA3_SECRETKEYBYTES];
-    unsigned char sigpub[SIGMA3_PUBLICKEYBYTES];
+    unsigned char skisec[HAWK768_SECRETKEYBYTES];
+    unsigned char skipub[HAWK768_PUBLICKEYBYTES];
+    unsigned char sigsec[TUAH3_SECRETKEYBYTES];
+    unsigned char sigpub[TUAH3_PUBLICKEYBYTES];
     int pubfd, secfd;
     ssize_t len;
 
-    skibidi768_keypair(skipub, skisec);
-    sigma3_keypair(sigpub, sigsec);
+    hawk768_keypair(skipub, skisec);
+    tuah3_keypair(sigpub, sigsec);
 
     pubfd = open("public.key", O_RDWR | O_CREAT, 0644);
     if (pubfd == -1) err(1, "open(public.key)");
     secfd = open("secret.key", O_RDWR | O_CREAT, 0600);
     if (secfd == -1) err(1, "open(secret.key)");
 
-    len = write(pubfd, skipub, SKIBIDI768_PUBLICKEYBYTES);
-    if (len != SKIBIDI768_PUBLICKEYBYTES) err(1, "write(public.key)");
-    len = write(pubfd, sigpub, SIGMA3_PUBLICKEYBYTES);
-    if (len != SIGMA3_PUBLICKEYBYTES) err(1, "write(public.key)");
+    len = write(pubfd, skipub, HAWK768_PUBLICKEYBYTES);
+    if (len != HAWK768_PUBLICKEYBYTES) err(1, "write(public.key)");
+    len = write(pubfd, sigpub, TUAH3_PUBLICKEYBYTES);
+    if (len != TUAH3_PUBLICKEYBYTES) err(1, "write(public.key)");
     fprintf(stderr, "wrote public key to public.key\n");
 
-    len = write(secfd, skisec, SKIBIDI768_SECRETKEYBYTES);
-    if (len != SKIBIDI768_SECRETKEYBYTES) err(1, "write(secret.key)");
-    len = write(secfd, sigsec, SIGMA3_SECRETKEYBYTES);
-    if (len != SIGMA3_SECRETKEYBYTES) err(1, "write(secret.key)");
+    len = write(secfd, skisec, HAWK768_SECRETKEYBYTES);
+    if (len != HAWK768_SECRETKEYBYTES) err(1, "write(secret.key)");
+    len = write(secfd, sigsec, TUAH3_SECRETKEYBYTES);
+    if (len != TUAH3_SECRETKEYBYTES) err(1, "write(secret.key)");
     fprintf(stderr, "wrote secret key to secret.key\n");
 
     close(secfd);
     close(pubfd);
-    crypto_wipe(skisec, SKIBIDI768_SECRETKEYBYTES);
-    crypto_wipe(sigsec, SIGMA3_SECRETKEYBYTES);
+    crypto_wipe(skisec, HAWK768_SECRETKEYBYTES);
+    crypto_wipe(sigsec, TUAH3_SECRETKEYBYTES);
     return 0;
 }
 
