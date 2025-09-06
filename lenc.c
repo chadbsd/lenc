@@ -10,6 +10,7 @@
 #include <err.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/random.h>
 
 #include "monocypher.h"
 #include "kem/api.h"
@@ -80,6 +81,7 @@ int lenc_decrypt(struct file *key, struct file *recs,
 int force, verbose, quiet;
 unsigned char read_buf[65536];
 unsigned char enc_buf[65536];
+static char *argv0;
 
 static struct option longopts[] = {
     /* commands */
@@ -128,6 +130,7 @@ main(int argc, char *argv[])
     FILE_INIT(&outpath);
     FILE_INIT(&sigpath);
 
+	argv0 = argv[0];
     op = NONE;
     optstring = "GEDSVvqfk:r:o:s:";
     while ((ch = getopt_long(argc, argv, optstring, longopts, NULL)) != -1) {
@@ -209,7 +212,7 @@ lenc_encrypt(struct file *key, struct file *recs,
     if (!recs->set) errx(1, "need recipients");
     if (!in->set) errx(1, "need file to encrypt");
 
-    arc4random_buf(coins, 64);
+    getrandom(coins, 64, 0);
 
     readpubkeyfile(recs->fd, &pub);
     readseckeyfile(key->fd, &sec);
@@ -230,7 +233,7 @@ lenc_encrypt(struct file *key, struct file *recs,
         if (len != SKIBIDI768_CIPHERTEXTBYTES) err(1, "write(ct)");
     }
 
-    arc4random_buf(nonce, 24);
+    getrandom(nonce, 24, 0);
     if (write(out->fd, nonce, 24) != 24) err(1, "write(nonce)");
 
     crypto_blake2b_init(&ctx, 64);

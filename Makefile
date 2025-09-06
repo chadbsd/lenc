@@ -26,7 +26,7 @@ KEM =	kem/cbd.o \
 
 CRYPTO = monocypher.o randombytes.o ${KEM} ${SIGN}
 
-all: enc lenc lenc.old
+all: enc lenc
 
 enc: enc.o ${CRYPTO}
 	${CC} -o $@ enc.o ${CRYPTO} ${LDFLAGS}

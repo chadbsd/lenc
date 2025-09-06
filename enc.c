@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <err.h>
 #include <sys/types.h>
+#include <sys/random.h>
 #include <sys/uio.h>
 
 #include "monocypher.h"
@@ -41,12 +42,15 @@ enum {
     VER,
 };
 
+static char *argv0;
+
 int
 main(int argc, char *argv[])
 {
     int ch, op;
     char *keypath, *recpath, *filepath, *outpath;
 
+	argv0 = argv[0];
     op = NONE;
     force = 0;
     keypath = recpath = filepath = outpath = NULL;
@@ -80,7 +84,7 @@ main(int argc, char *argv[])
             outpath = optarg;
             break;
         default:
-            fprintf(stderr, "usage: %s "USAGE"\n", getprogname());
+            fprintf(stderr, "usage: %s "USAGE"\n", argv0);
             return 1;
         }
     }
@@ -91,7 +95,7 @@ main(int argc, char *argv[])
     case DEC: return enc_decrypt(keypath, recpath, filepath, outpath);
     case VER: return enc_verify(keypath, recpath, filepath);
     default:
-        fprintf(stderr, "usage: %s "USAGE"\n", getprogname());
+        fprintf(stderr, "usage: %s "USAGE"\n", argv0);
         return 1;
     }
 }
@@ -137,7 +141,7 @@ enc_encrypt(char *keypath, char *recpath, char *filepath, char *outpath)
     static unsigned char reckey[SKIBIDI768_PUBLICKEYBYTES];
     static unsigned char ct[SKIBIDI768_CIPHERTEXTBYTES];
     static unsigned char nonce[24], mac[16];
-    static unsigned char sigpath[64];
+    static char sigpath[64];
     uint64_t counter;
     int infd, outfd, sigfd;
     ssize_t len;
@@ -158,7 +162,7 @@ enc_encrypt(char *keypath, char *recpath, char *filepath, char *outpath)
         if (filepath == NULL && !force && isatty(STDOUT_FILENO)) {
             fprintf(stderr, "must set output file "
                             "or pass -f to write to stdout\n");
-            fprintf(stderr, "usage: %s "USAGE"\n", getprogname());
+            fprintf(stderr, "usage: %s "USAGE"\n", argv0);
             exit(1);
         }
         len = strlen(filepath)+5;
@@ -184,7 +188,7 @@ enc_encrypt(char *keypath, char *recpath, char *filepath, char *outpath)
     
     if (keypath == NULL && !force) {
         fprintf(stderr, "no key signing path specified\n");
-        fprintf(stderr, "usage: %s "USAGE"\n", getprogname());
+        fprintf(stderr, "usage: %s "USAGE"\n", argv0);
         exit(1);
     }
 
@@ -197,7 +201,7 @@ enc_encrypt(char *keypath, char *recpath, char *filepath, char *outpath)
     len = write(outfd, ct, SKIBIDI768_CIPHERTEXTBYTES);
     if (len != SKIBIDI768_CIPHERTEXTBYTES) err(1, "write(ct)");
     
-    arc4random_buf(nonce, 24);
+    getrandom(nonce, 24, 0);
     write(outfd, nonce, 24);
 
     crypto_blake2b_init(&ctx, 64);
@@ -275,7 +279,7 @@ enc_decrypt(char *keypath, char *secpath, char *filepath, char *outpath)
         if (filepath == NULL && !force && isatty(STDOUT_FILENO)) {
             fprintf(stderr, "must set output file "
                             "or pass -f to write to stdout\n");
-            fprintf(stderr, "usage: %s "USAGE"\n", getprogname());
+            fprintf(stderr, "usage: %s "USAGE"\n", argv0);
             exit(1);
         }
         len = strlen(filepath)+5;
