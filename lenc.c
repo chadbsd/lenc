@@ -248,7 +248,7 @@ again:
                                     sizeof(uint64_t), shared, nonce, counter);
         counter = crypto_chacha20_x(enc_buf, read_buf, len,
                                     shared, nonce, counter);
-        crypto_poly1305(mac, read_buf, len, shared);
+        crypto_poly1305(mac, enc_buf, len, shared);
         if (write(out->fd, mac, 16) != 16) err(1, "write(mac)");
         if (write(out->fd, &enc_len, sizeof(uint64_t)) != sizeof(uint64_t)) {
             err(1, "write(enc_len)");
