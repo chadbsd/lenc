@@ -339,12 +339,12 @@ lenc_decrypt(struct file *key, struct file *rec,
             err(1, "read(enc)");
         }
         if (len != (ssize_t)len2) err(1, "read(enc)");
+        crypto_poly1305(mac2, read_buf, len, shared);
+        if (memcmp(mac1, mac2, 16) != 0) err(1, "invalid state (mac)");
         counter = crypto_chacha20_x(enc_buf, read_buf, len,
                                     shared, nonce, counter);
         if (write(out->fd, enc_buf, len) != len) err(1, "write(enc)");
         crypto_blake2b_update(&ctx, enc_buf, len);
-        crypto_poly1305(mac2, enc_buf, len, shared);
-        if (memcmp(mac1, mac2, 16) != 0) err(1, "invalid state (mac)");
         if (len < 65536) break;
     }
     crypto_blake2b_final(&ctx, hash1);
