@@ -243,16 +243,16 @@ again:
     /* TODO: guarantee 65536 is read until the very end */
     while ((len = read(in->fd, read_buf, 65536)) > 0) {
         crypto_blake2b_update(&ctx, read_buf, len);
-        crypto_poly1305(mac, read_buf, len, shared);
-        if (write(out->fd, mac, 16) != 16) err(1, "write(mac)");
         len2 = len;
         counter = crypto_chacha20_x((uint8_t*)&enc_len, (uint8_t*)&len2, 
                                     sizeof(uint64_t), shared, nonce, counter);
+        counter = crypto_chacha20_x(enc_buf, read_buf, len,
+                                    shared, nonce, counter);
+        crypto_poly1305(mac, read_buf, len, shared);
+        if (write(out->fd, mac, 16) != 16) err(1, "write(mac)");
         if (write(out->fd, &enc_len, sizeof(uint64_t)) != sizeof(uint64_t)) {
             err(1, "write(enc_len)");
         }
-        counter = crypto_chacha20_x(enc_buf, read_buf, len,
-                                    shared, nonce, counter);
         if (write(out->fd, enc_buf, len) != len) err(1, "write(enc)");
     }
     if (len == -1) {
